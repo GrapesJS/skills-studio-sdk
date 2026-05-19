@@ -19,6 +19,7 @@ For a better understanding of this guide, we recommend checking out the [Compone
 
 * [Initialization](#initialization)
 * [Configuration](#configuration)
+* [Click insertion](#click-insertion)
 * [Programmatic usage](#programmatic-usage)
 * [I18n](#i18n)
 * [Customization](#customization)
@@ -187,6 +188,125 @@ import '@grapesjs/studio-sdk/style';
   }}
 />
 
+```
+
+## Click insertion
+
+When a block is clicked in the Block Manager, Studio tries to append its content to the canvas automatically. You can customize that behavior globally with `appendOnClick`.
+
+The hook can:
+
+* return `false` to disable click insertion for the current block
+* return `true` to continue with the default click insertion flow
+* return `{ target, content }` to fully override where and how the block is inserted
+
+This is closely related to component-level [drop targets](components/properties.md#drop-targets) and [append fallback](components/properties.md#append-fallback):
+
+* `appendOnClick` is the global entry point for block clicks
+* `dropTargets` defines which components are considered valid custom targets
+* `appendFallback` defines how the final insertion should be wrapped when no normal target is valid
+
+The example below shows all three paths: disabling click insertion for one block, providing a custom override for another, and letting Studio fall back to the component-level `appendFallback`.
+
+```jsx
+import StudioEditor from '@grapesjs/studio-sdk/react';
+import '@grapesjs/studio-sdk/style';
+
+// ...
+<StudioEditor
+  options={{
+    plugins: [
+      editor => {
+        editor.Components.addType('custom-row', {
+          model: {
+            defaults: {
+              name: 'Row',
+              draggable: (src, trg) => trg.getType() === 'wrapper',
+              droppable: src => src.getType() === 'custom-column',
+              style: 'display: flex; gap: 16px; min-height: 140px; padding: 18px; border: 2px dashed #7c8aa5; background: #f8fafc;'
+            }
+          }
+        });
+
+        editor.Components.addType('custom-column', {
+          model: {
+            defaults: {
+              name: 'Column',
+              draggable: (src, trg) => trg.getType() === 'custom-row',
+              droppable: false,
+              style: 'flex: 1; min-height: 90px; padding: 16px; border: 1px solid #9fb0ca; background: white;',
+              components: 'Column content',
+              dropTargets: ({ root }) => ({
+                items: root.findType('custom-row').map(component => ({ component })),
+                notFound: 'This component can only be inserted inside a Row, and none was found.'
+              }),
+              appendFallback: ({ content, dropTargets, editor }) => ({
+                target: dropTargets[0]?.component || editor.getWrapper(),
+                content: dropTargets.length
+                  ? content
+                  : {
+                      type: 'custom-row',
+                      components: content
+                    }
+              })
+            }
+          }
+        });
+      }
+    ],
+    blocks: {
+      default: [
+        { id: 'row', label: 'Row', content: { type: 'custom-row' } },
+        { id: 'column', label: 'Column', content: { type: 'custom-column' } },
+        { id: 'column-custom-content', label: 'Column (Custom Content)', content: { type: 'custom-column' } },
+        { id: 'column-disabled', label: 'Column (Disabled Click)', content: { type: 'custom-column' } }
+      ],
+      appendOnClick: ({ block, root }) => {
+        if (block.getId() === 'column-disabled') {
+          return { notFound: 'Click insertion is disabled for this block.' };
+        }
+
+        if (block.getId() === 'column-custom-content') {
+          return {
+            target: root,
+            content: {
+              type: 'custom-row',
+              components: [block.getContent(), block.getContent(), block.getContent()]
+            }
+          };
+        }
+
+        return true;
+      }
+    },
+    project: {
+      default: { pages: [{ name: 'Home' }] }
+    },
+    layout: {
+      default: {
+        type: 'row',
+        style: { height: '100%' },
+        children: [
+          {
+            type: 'panelBlocks',
+            header: { label: 'Blocks', collapsible: false, style: { width: '300px' } },
+            symbols: false
+          },
+          { type: 'canvas' }
+        ]
+      }
+    }
+  }}
+/>
+
+```
+
+If you want to disable click insertion completely, you can do it globally:
+
+```ts
+blocks: {
+  appendOnClick: () => false
+}
 ```
 
 ## Programmatic usage
@@ -569,4 +689,3 @@ function openBlocks(editor, layout) {
 />
 
 ```
-

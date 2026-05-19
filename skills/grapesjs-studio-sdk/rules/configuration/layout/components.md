@@ -1876,6 +1876,81 @@ image
 
 ``` |
 
+## PanelEditCode
+
+Displays editable code for the selected page. By default it renders the code fields plus an `Update` action below them.
+
+```jsx
+import StudioEditor from '@grapesjs/studio-sdk/react';
+import '@grapesjs/studio-sdk/style';
+
+// ...
+<StudioEditor
+  options={{
+    layout: {
+      default: {
+        type: 'row',
+        style: { height: '100%' },
+        children: [
+          {
+            type: 'canvasSidebarTop',
+            sidebarTop: {
+              leftContainer: { buttons: [] },
+              rightContainer: {
+                buttons: [
+                  {
+                    id: 'openEditCode',
+                    icon: 'codeBraces',
+                    onClick: ({ editor }) => {
+                      editor.runCommand('studio:layoutToggle', {
+                        id: 'editCodeDialog',
+                        header: false,
+                        placer: { type: 'dialog', title: 'Edit code', size: 'l' },
+                        layout: { type: 'panelEditCode' }
+                      });
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  }}
+/>
+
+```
+
+#### PanelEditCode properties
+
+Show properties
+
+| Property     | Type          | Description                                                                                                                                           |
+| ------------ | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| type\*       | panelEditCode | Type of the layout component.                                                                                                                         |
+| as           | string        | The HTML tag to use for the layout component.                                                                                                         |
+| className    | string        | The CSS class name(s) for the component.                                                                                                              |
+| htmlAttrs    | object        | The HTML attributes for the component.                                                                                                                |
+| id           | string        | The unique identifier for the component.                                                                                                              |
+| layoutAfter  | function      | Custom layout rendered after the code fields. When provided, the default footer is disabled. Receives `editor`, `state`, `setState`, and `update`. |
+| layoutBefore | function      | Custom layout rendered before the code fields. Receives `editor`, `state`, `setState`, and `update`.                                                |
+| state        | function      | Override the initial editable state of the component.                                                                                                 |
+| style        | object        | The inline styles for the component.                                                                                                                  |
+
+#### React component
+
+This component is also exported for React consumers. See the [React Layout Components section](overview.md#react-layout-components) for the complete setup.
+
+```jsx
+import StudioEditor, { StudioPanelEditCode } from '@grapesjs/studio-sdk/react';
+
+<StudioEditor options={{...}} withComponents>
+  <StudioPanelEditCode />
+</StudioEditor>
+
+```
+
 ## PanelTemplates
 
 Displays a list of templates that users can select as a starting point for their project. For more details, refer to the [Templates page](../templates.md).

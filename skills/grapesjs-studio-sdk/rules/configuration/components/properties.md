@@ -21,6 +21,8 @@ In this section, we'll explore the various properties that can be defined for a 
 * [Traits](#traits)
 * [Toolbar](#toolbar)
 * [Context Menu](#context-menu)
+* [Drop targets](#drop-targets)
+* [Append fallback](#append-fallback)
 * [Properties from HTML](#properties-from-html)
 
 ## Structural Properties
@@ -1159,6 +1161,206 @@ The `components.contextMenu` function (global) and the `contextMenu` property (c
 
 The `contextMenu` function should return an array of context menu items. The default items array is first passed to any component-specific configuration, then to the global one. If the final result is an empty array, the context menu won't be displayed.
 
+## Drop targets
+
+Use `dropTargets` to highlight the components where another component can be dropped during drag and drop.
+
+* The component-level `dropTargets` function receives `root`, `editor`, and either `block` or `component`, depending on where the drag started.
+* It can return an array of `DropTarget` items directly, or an object with `items` and `notFound`.
+* Returned items are rendered as `dropTarget` canvas spots.
+* If no items are returned, Studio uses `notFound` first and then falls back to the `domComponents.dropTargets.notFound.${type}` i18n key when available.
+
+The example below defines two custom components, `Row` and `Column`. The `Column` component advertises `Row` components as its only valid custom drop targets.
+
+```jsx
+import StudioEditor from '@grapesjs/studio-sdk/react';
+import '@grapesjs/studio-sdk/style';
+
+// ...
+<StudioEditor
+  options={{
+    plugins: [
+      editor => {
+        editor.Components.addType('custom-row', {
+          model: {
+            defaults: {
+              name: 'Row',
+              draggable: (src, trg) => trg.getType() === 'wrapper',
+              style: 'display: flex; gap: 16px; min-height: 140px; padding: 18px; border: 2px dashed #7c8aa5; background: #f8fafc;'
+            }
+          }
+        });
+
+        editor.Components.addType('custom-column', {
+          model: {
+            defaults: {
+              name: 'Column',
+              draggable: (src, trg) => trg.getType() === 'custom-row',
+              style: 'flex: 1; min-height: 90px; padding: 16px; border: 1px solid #9fb0ca; background: white;',
+              dropTargets: ({ root }) => {
+                const items = root.findType('custom-row').map(component => ({ component }));
+                return {
+                  items,
+                  notFound: 'This component can only be dropped inside a Row, and none was found.'
+                };
+              }
+            }
+          }
+        });
+
+        editor.Blocks.clear();
+        editor.Blocks.add('row', { label: 'Row', content: { type: 'custom-row' } });
+        editor.Blocks.add('column', { label: 'Column', content: { type: 'custom-column' } });
+
+        editor.onReady(() => {
+          editor.getWrapper().append([
+            {
+              type: 'custom-row',
+              components: [
+                { type: 'custom-column', components: 'Column A' },
+                { type: 'custom-column', components: 'Column B' }
+              ]
+            }
+          ]);
+        });
+      }
+    ],
+    layout: {
+      default: {
+        type: 'row',
+        style: { height: '100%' },
+        children: [
+          {
+            type: 'panelBlocks',
+            header: { label: 'Blocks', collapsible: false, style: { width: '300px' } },
+            symbols: false
+          },
+          { type: 'canvas' }
+        ]
+      }
+    },
+    project: {
+      default: { pages: [{ name: 'Home' }] }
+    }
+  }}
+/>
+
+```
+
+#### Global drop targets
+
+You can also control the feature globally via `canvas.dropTargets`. The global function receives the same props and can:
+
+* return `false` to disable custom drop targets for the current drag
+* return an array or `{ items, notFound }` to override the component-level result
+* return `true` to continue with the component-level `dropTargets` logic
+
+```ts
+canvas: {
+  dropTargets: ({ root, block, component }) => {
+    if (component) return false;
+
+    if (block?.getId() === 'special-column') {
+      return root.findType('custom-row').map(component => ({ component }));
+    }
+
+    return true;
+  }
+}
+```
+
+## Append fallback
+
+Use `appendFallback` to customize what happens when a component is attempted to be appended, for example from a [Block click](../blocks.md#click-insertion) or via `StudioCommands.appendComponent`, but there is no valid target where it can be dropped.
+
+* Studio first tries the default insertion flow: append after the selected component, append inside the selected component, or append to the root if possible.
+* If none of those targets accept the content, Studio resolves the source component type and runs its `appendFallback`.
+* The function receives `editor`, `content`, the source `block` when available, and the resolved [dropTargets](#drop-targets).
+
+The example below defines a `Column` component that can only live inside a `Row`. When clicked from the Block Manager, Studio first looks for existing `Row` components; if none are found, it creates a new `Row > Column` chain automatically.
+
+```jsx
+import StudioEditor from '@grapesjs/studio-sdk/react';
+import '@grapesjs/studio-sdk/style';
+
+// ...
+<StudioEditor
+  options={{
+    plugins: [
+      editor => {
+        editor.Components.addType('custom-row', {
+          model: {
+            defaults: {
+              name: 'Row',
+              draggable: (src, trg) => trg.getType() === 'wrapper',
+              droppable: src => src.getType() === 'custom-column',
+              style: 'display: flex; gap: 16px; min-height: 140px; padding: 18px; border: 2px dashed #7c8aa5; background: #f8fafc;'
+            }
+          }
+        });
+
+        editor.Components.addType('custom-column', {
+          model: {
+            defaults: {
+              name: 'Column',
+              draggable: (src, trg) => trg.getType() === 'custom-row',
+              droppable: false,
+              style: 'flex: 1; min-height: 90px; padding: 16px; border: 1px solid #9fb0ca; background: white;',
+              components: 'Column content',
+              dropTargets: ({ root }) => ({
+                items: root.findType('custom-row').map(component => ({ component })),
+                notFound: 'This component can only be inserted inside a Row, and none was found.'
+              }),
+              appendFallback: ({ content, dropTargets, editor }) => ({
+                target: dropTargets[0]?.component || editor.getWrapper(),
+                content: dropTargets.length
+                  ? content
+                  : {
+                      type: 'custom-row',
+                      components: content
+                    }
+              })
+            }
+          }
+        });
+
+        editor.Blocks.clear();
+        editor.Blocks.add('row', { label: 'Row', content: { type: 'custom-row' } });
+        editor.Blocks.add('column', { label: 'Column', content: { type: 'custom-column' } });
+
+        editor.onReady(() => {
+          editor.getWrapper()?.append({
+            type: 'custom-row',
+            components: [
+              { type: 'custom-column', components: 'Column A' },
+              { type: 'custom-column', components: 'Column B' }
+            ]
+          });
+        });
+      }
+    ],
+    layout: {
+      default: {
+        type: 'row',
+        style: { height: '100%' },
+        children: [
+          {
+            type: 'panelBlocks',
+            header: { label: 'Blocks', collapsible: false, style: { width: '300px' } },
+            symbols: false
+          },
+          { type: 'canvas' }
+        ]
+      }
+    },
+    project: {
+      default: { pages: [{ name: 'Home' }] }
+    }
+  }}
+/>
+
+```
+
 ## Properties from HTML
 
 GrapesJS allows you to define component properties directly through HTML using the `data-gjs-PROPERTY_NAME="VALUE"` attributes. This enables you to pass properties when importing components via HTML strings.
@@ -1222,4 +1424,3 @@ import '@grapesjs/studio-sdk/style';
 />
 
 ```
-

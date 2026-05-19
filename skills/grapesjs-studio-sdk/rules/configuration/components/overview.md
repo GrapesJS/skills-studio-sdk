@@ -223,7 +223,3 @@ To explore all available properties and learn how to use them to customize compo
 Every component created inside the editor has a component instance that provide a set of built-in methods that you can use to manipulate components, retrieve their properties, or listen to events.
 
 To explore the available methods, how to extend and use them to customize component behavior in the editor, refer to the [Component Methods page](methods.md).
-
-warning
-
-This page is a work in progress.
