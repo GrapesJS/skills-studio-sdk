@@ -17,6 +17,8 @@ Studio initializes with a preconfigured layout, allowing you to start using the 
 
 Below is the configuration used by the default layout via `layout.default` option.
 
+If you're using React, the `layout` config is ideal for framework-agnostic UI assembly, but React consumers can also import and compose the editor UI directly with the public Studio components. See [React Layout Components](#react-layout-components) below.
+
 ```jsx
 import StudioEditor from '@grapesjs/studio-sdk/react';
 import '@grapesjs/studio-sdk/style';
@@ -381,3 +383,120 @@ import '@grapesjs/studio-sdk/style';
 
 ```
 
+## React Layout Components
+
+Most [Layout Components](components.md) are also exported for React consumers via `@grapesjs/studio-sdk/react`, so you can assemble the editor UI directly in React instead of using the framework-agnostic `layout` config.
+
+To enable this mode, pass `withComponents` to `StudioEditor` and provide your own React layout. When doing so, make sure your tree includes `StudioCanvas`.
+
+The example below reproduces the default web layout using React components. Some components include built-in defaults. For example, if you omit children inside `StudioSidebarTop`, Studio will render its default content.
+
+```jsx
+import StudioEditor, {
+  StudioButton,
+  StudioCanvas,
+  StudioCommands,
+  StudioDevices,
+  StudioIcon,
+  StudioPanelLayers,
+  StudioPanelPages,
+  StudioPanelProperties,
+  StudioPanelSelectors,
+  StudioPanelStyles,
+  StudioSidebarBottom,
+  StudioSidebarLeft,
+  StudioSidebarRight,
+  StudioSidebarTop,
+  StudioTabs,
+  StudioWithEditor,
+  useStudioEditor
+} from '@grapesjs/studio-sdk/react';
+import '@grapesjs/studio-sdk/style';
+
+function ComponentWithEditor() {
+  const editor = useStudioEditor();
+  return <div>{!editor ? 'Loading...' : 'Editor available'}</div>;
+}
+
+// ...
+<StudioEditor options={{ ... }} withComponents>
+  <div className="flex flex-col flex-nowrap gap-3 h-full p-3">
+    <StudioSidebarTop className="rounded-md border gap-3 px-3">
+      <div className="flex-grow">
+        <StudioButton
+          variant="primary"
+          icon="plus"
+          size="s"
+          onClick={({ editor }) => editor.runCommand(StudioCommands.openBlocks)}
+        />
+      </div>
+      <div>
+        <StudioDevices />
+      </div>
+      <div className="flex flex-grow items-center gap-4 justify-end">
+        <StudioWithEditor>
+          {({ editor }) =>
+            [
+              { id: 'core:component-outline', icon: 'borderRadius' },
+              { id: 'core:preview', icon: 'eye' },
+              { id: 'core:fullscreen', icon: 'arrowExpandAll', opts: { target: 'body' } },
+              { id: 'studio:dialogExportCode', icon: 'xml' },
+              { id: 'studio:dialogImportCode', icon: 'trayArrowDown' },
+              { id: 'studio:clearPage', icon: 'delete' },
+              { id: 'core:undo', icon: 'arrowULeftTop' },
+              { id: 'core:redo', icon: 'arrowURightTop' }
+            ].map(cmd => (
+              <button
+                key={cmd.id}
+                onClick={() => {
+                  const { Commands } = editor;
+                  Commands.isActive(cmd.id) ? Commands.stop(cmd.id) : Commands.run(cmd.id, cmd.opts);
+                }}
+              >
+                <StudioIcon icon={cmd.icon} size="18px" />
+              </button>
+            ))
+          }
+        </StudioWithEditor>
+      </div>
+    </StudioSidebarTop>
+
+    <div className="flex flex-nowrap flex-grow gap-3 min-h-0">
+      <StudioSidebarLeft className="border rounded-md">
+        <StudioPanelPages />
+        <StudioPanelLayers header={{ label: 'Layers', icon: 'layers', className: 'border-y' }} />
+      </StudioSidebarLeft>
+
+      <StudioCanvas className="flex-grow" overlayProps={{ className: 'hidden' }} />
+
+      <StudioSidebarRight className="border rounded-md">
+        <StudioTabs
+          value="styles"
+          tabs={[
+            {
+              id: 'styles',
+              label: 'Styles',
+              children: (
+                <>
+                  <StudioPanelSelectors className="p-2" />
+                  <StudioPanelStyles className="border-t" />
+                </>
+              )
+            },
+            {
+              id: 'props',
+              label: 'Properties',
+              children: <StudioPanelProperties className="p-2" />
+            }
+          ]}
+        />
+      </StudioSidebarRight>
+    </div>
+
+    <StudioSidebarBottom className="rounded-md border gap-3 px-3">
+      <ComponentWithEditor />
+    </StudioSidebarBottom>
+  </div>
+</StudioEditor>
+
+```
